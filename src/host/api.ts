@@ -234,7 +234,7 @@ async function dispatch(
     case 'restore':
       return restoreEntry(deps, payload)
     case 'purgeDeleted':
-      return purgeDeleted(deps)
+      return purgeDeleted(deps, payload)
     case 'search':
       return searchMemory(deps, payload)
     case 'detail':
@@ -307,6 +307,10 @@ async function statusOf(deps: MemoryApiDeps): Promise<unknown> {
     orphaned: 0,
   }
   for (const entry of entries) counts[entry.status] = (counts[entry.status] ?? 0) + 1
+  // 待清理里有多少是 topics：面板要据此决定「彻底删除主题记忆」按钮出不出来
+  const pendingTopics = entries.filter(
+    (entry) => entry.status === 'deleted_pending' && isTopicEntry(entry),
+  ).length
   // 使用信号是旁路文件，展示前合并进来（不改索引、不影响检索排序）
   mergeUsage(entries, await loadUsage(deps.backend))
   const recent = entries
@@ -347,7 +351,7 @@ async function statusOf(deps: MemoryApiDeps): Promise<unknown> {
   return {
     root: deps.backend.root,
     config: { ...deps.config },
-    counts,
+    counts: { ...counts, deleted_pending_topics: pendingTopics },
     entries: recent,
     sessions,
     facets: buildFacets(entries),
@@ -451,12 +455,25 @@ async function restoreEntry(
   })
 }
 
-/** 把已标 deleted_pending 的 episodes/raw 文件真正删掉（topics 永不删）。 */
-async function purgeDeleted(deps: MemoryApiDeps): Promise<unknown> {
+/** topics/ 下（或 type 为 topic/summary）的条目视为共享记忆。 */
+function isTopicEntry(entry: IndexEntry): boolean {
+  return entry.type === 'topic' || entry.type === 'summary' || entry.path.startsWith('topics/')
+}
+
+/**
+ * 把已标 deleted_pending 的条目真正删掉。
+ * 默认只删 episodes/raw —— topics 是共享知识，误删代价大，所以留到面板上单独一个
+ * 带二次确认的按钮（payload.includeTopics=true）才删。
+ */
+async function purgeDeleted(
+  deps: MemoryApiDeps,
+  payload: Record<string, unknown>,
+): Promise<unknown> {
+  const includeTopics = payload.includeTopics === true
   return mutateIndex(deps.backend, async (entries) => {
-    const targets = entries.filter(
-      (entry) => entry.status === 'deleted_pending' && (entry.type === 'episode' || entry.type === 'raw'),
-    )
+    const pending = entries.filter((entry) => entry.status === 'deleted_pending')
+    const targets = pending.filter((entry) => includeTopics || !isTopicEntry(entry))
+    const skipped = pending.length - targets.length
     const removed: string[] = []
     for (const entry of targets) {
       if (await deps.backend.removeFile(entry.path)) removed.push(entry.path)
@@ -467,10 +484,17 @@ async function purgeDeleted(deps: MemoryApiDeps): Promise<unknown> {
     await deps.backend.appendLedger({
       at: deps.backend.now(),
       type: 'ui/purge',
+      include_topics: includeTopics,
       removed_count: removed.length,
       removed_paths: removed,
+      skipped_topics: skipped,
     })
-    return { removed_count: removed.length, removed_paths: removed }
+    return {
+      removed_count: removed.length,
+      removed_paths: removed,
+      removed_topic_count: targets.filter((entry) => isTopicEntry(entry)).length,
+      skipped_topics: skipped,
+    }
   })
 }
 

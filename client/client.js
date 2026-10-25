@@ -127,6 +127,7 @@ window.__ModuleLoader__.load({
       const [digestSlots, setDigestSlots] = useState(null)
       const [queryLog, setQueryLog] = useState(null)
       const [pendingForget, setPendingForget] = useState('')
+      const [pendingPurgeTopics, setPendingPurgeTopics] = useState(false)
       const [error, setError] = useState('')
       const [notice, setNotice] = useState('')
       const [busy, setBusy] = useState('')
@@ -264,6 +265,7 @@ window.__ModuleLoader__.load({
       }
 
       const counts = status === null ? null : status.counts
+      const pendingTopics = counts === null ? 0 : (counts.deleted_pending_topics ?? 0)
       const entries = status === null ? [] : status.entries
       const sessions = status === null || status.sessions === undefined ? [] : status.sessions
       // 检索日志只展示最近 20 条（后端 entries 时间正序，这里取尾部再倒序，最新在上）
@@ -831,9 +833,35 @@ window.__ModuleLoader__.load({
               ),
               h(
                 'button',
-                { className: 'ma-btn danger', disabled: busyNow, onClick: () => run('purge', 'purgeDeleted', {}, (d) => `已清理 ${d.removed_count} 个文件`) },
+                {
+                  className: 'ma-btn danger',
+                  disabled: busyNow,
+                  onClick: () => run('purge', 'purgeDeleted', {}, (d) => (
+                    d.skipped_topics > 0
+                      ? `已清理 ${d.removed_count} 个文件；${d.skipped_topics} 条主题记忆是共享知识，已跳过（要删请点「彻底删除主题记忆」）`
+                      : `已清理 ${d.removed_count} 个文件`
+                  )),
+                },
                 busy === 'purge' ? '清理中…' : '清理已软删',
               ),
+              pendingTopics > 0
+                ? (pendingPurgeTopics
+                  ? h(
+                    'button',
+                    {
+                      className: 'ma-btn danger',
+                      disabled: busyNow,
+                      onClick: () => run('purgeTopics', 'purgeDeleted', { includeTopics: true }, (d) => `已彻底删除 ${d.removed_topic_count} 条主题记忆（共清掉 ${d.removed_count} 个文件）`)
+                        .then(() => setPendingPurgeTopics(false)),
+                    },
+                    `确认删 ${pendingTopics} 条`,
+                  )
+                  : h(
+                    'button',
+                    { className: 'ma-btn danger', disabled: busyNow, onClick: () => setPendingPurgeTopics(true) },
+                    `彻底删除主题记忆（${pendingTopics}）`,
+                  ))
+                : null,
               h(
                 'button',
                 { className: 'ma-btn', disabled: busyNow, onClick: doExport },
@@ -841,7 +869,7 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
-          h('div', { className: 'ma-hint' }, '索引只是缓存，删了能重建；「清理」只删已软删的 episodes/raw，共享 topics 永远保留。'),
+          h('div', { className: 'ma-hint' }, '索引只是缓存，删了能重建；「清理已软删」只删 episodes/raw。主题记忆（topics）是共享知识，默认不删——确实要删就点「彻底删除主题记忆」，还要再确认一次。'),
         ),
 
         /* ---------- 条目列表 ---------- */

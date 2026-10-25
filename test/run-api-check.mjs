@@ -209,6 +209,36 @@ purged.body.ok && purged.body.data.removed_count === 2
 const gone = await stat(path.join(root, episodic.path)).then(() => false).catch(() => true)
 gone ? ok('清理后文件真的没了') : fail('清理后文件仍在')
 
+// 主题记忆：默认清理跳过，includeTopics=true 才真删（面板上是带二次确认的独立按钮）
+const topicTarget = await writeHandler(backend, {
+  summary: '主题清理测试：这条落在 topics/ 下',
+  type: 'topic',
+  session_id: 'ui-session',
+})
+await call({ op: 'softDelete', id: topicTarget.id })
+const pendingStatus = await call({ op: 'status' })
+pendingStatus.body.data.counts.deleted_pending_topics === 1
+  ? ok('status 能数出待清理的主题记忆（面板据此显示按钮）')
+  : fail(`deleted_pending_topics 不对：${JSON.stringify(pendingStatus.body.data.counts)}`)
+
+const purgedSkip = await call({ op: 'purgeDeleted' })
+purgedSkip.body.ok && purgedSkip.body.data.removed_count === 0 && purgedSkip.body.data.skipped_topics === 1
+  ? ok('purgeDeleted 默认跳过 topics（removed=0、skipped=1）')
+  : fail(`默认清理不该删 topics：${JSON.stringify(purgedSkip.body)}`)
+
+const topicStillThere = await stat(path.join(root, topicTarget.path)).then(() => true).catch(() => false)
+topicStillThere ? ok('默认清理后 topic 文件仍在') : fail('默认清理把 topic 文件删了')
+
+const purgedTopics = await call({ op: 'purgeDeleted', includeTopics: true })
+purgedTopics.body.ok
+  && purgedTopics.body.data.removed_topic_count === 1
+  && purgedTopics.body.data.removed_count === 1
+  ? ok('includeTopics=true → 主题记忆真的删掉')
+  : fail(`includeTopics 清理不对：${JSON.stringify(purgedTopics.body)}`)
+
+const topicGone = await stat(path.join(root, topicTarget.path)).then(() => false).catch(() => true)
+topicGone ? ok('主题清理后文件真的没了') : fail('主题清理后文件仍在')
+
 // 并发写：没有索引锁时这里会丢一条（读-改-写互相覆盖）
 const totalBefore = (await call({ op: 'status' })).body.data.counts.total
 await Promise.all([

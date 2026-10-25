@@ -100,7 +100,8 @@ export function apply(ctx, config)     // 只做接线
 | 冲突收尾 | 冲突行给「保留这条」/「丢弃」：留下的转 active，同槽位其它说法转 superseded 并退出检索 |
 | 软删 / 恢复 | 软删只是标记（文件保留、退出检索），随时能点「恢复」撤回 |
 | 重建索引 | 等价 `rebuildIndex()`，索引坏了点一下就好 |
-| 清理已软删 | 物理删掉已软删的 `episodes/`、`raw/` 文件；`topics/` 永不删 |
+| 清理已软删 | 物理删掉已软删的 `episodes/`、`raw/` 文件；遇到已软删的 `topics/` 会跳过并回显「跳过 N 条」 |
+| 彻底删除主题记忆 | 只在有待清理的 `topics/` 时出现，两步确认后连主题文件一起物理删除 |
 | 按会话忘却 | 列出会话及条数，两步确认后整批忘却（共享 topics 只解绑来源） |
 | 导出备份 | 一键把索引 + 所有记忆文件打成 JSON bundle 下载走（≤8MB，超了会标记截断） |
 
@@ -113,6 +114,8 @@ export function apply(ctx, config)     // 只做接线
 - **宿主半身** `src/host/api.ts`：一个路由 `POST /memory-agent/api`，按 `op` 分发
   （`status` / `config.set` / `rebuild` / `confirm` / `resolve` / `softDelete` / `restore` /
   `purgeDeleted` / `search` / `detail` / `create` / `forgetSession` / `export`）。
+  `purgeDeleted` 默认只清 `episodes/`、`raw/`（并返回 `skipped_topics` 告诉你跳过了几条）；
+  传 `{ "includeTopics": true }` 才连 `topics/` 一起删，返回值里带 `removed_topic_count`。
   三重门槛：只接受 **POST + `content-type: application/json`**、只放行**本机回环**、
   并且要么 `Origin` 与 `Host` 一致、要么带面板自带的 `x-dsh-memory-agent: panel` 头。
   所以 `curl -X POST` 这种没有 Origin 也没有面板头的请求一律 403；
@@ -614,7 +617,7 @@ query 为空的纯浏览分支（只带过滤条件不带词）不进这条日�
 
 - `soft`（默认）：只改状态（同时写回文件 front-matter）+ 写 `ledger.jsonl`。
 - `hard`：在 `soft` 基础上**物理删除**本次 session 相关的 `episodes/`、`raw/` 文件并移出索引；
-  `topics/` 永不删除——那是共享知识。
+  `topics/` 永不删除——那是共享知识（要删只能走面板的「彻底删除主题记忆」，且需两步确认）。
 
 返回：
 
@@ -784,7 +787,8 @@ verify.sh → npm pack 预检 → 认证闸门 → npm publish --access public
 - `memory_nav` 默认不带正文；`raw/` 全文只能显式下钻。
 - 确认闸门挡住「模型自己把猜测写成事实」。
 - 删除是显式的：`session_only` 软删保留文件，`hard` 才真删 `episodes/`、`raw/`；
-  共享 `topics/` 永远不会被整文件删除。
+  共享 `topics/` 默认不会被整文件删除（清理按钮只跳它、不删它），
+  真要删得在面板上点「彻底删除主题记忆」并二次确认。
 - 审计事件只增不改，`ledger.jsonl` 里能查到每次写入/冲突/确认/忘却的来源。
 - 包里不写死任何真实姓名、邮箱、内部地址；`LICENSE` 用 contribution 署名。
 

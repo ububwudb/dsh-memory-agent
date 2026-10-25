@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "File-based long-context memory for DeepSeek Harness: fixed read budget, BM25 hybrid search, confirmation gate, index rebuild, atomic writes and explicit session forget. Zero hard dependencies.",
   "type": "module",
   "main": "lib/index.js",

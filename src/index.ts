@@ -6,6 +6,10 @@
  * 2. 把纯函数 handler 包成 defineTool 定义并注册到 ctx.tools；
  * 3. 用 ctx.effect 挂清理，卸载时注销工具，不留悬空状态。
  */
+import { appendFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { performance } from 'node:perf_hooks'
+import { join } from 'node:path'
 import { createFileBackend, resolveMemoryRoot } from './store/file-backend.js'
 import type { MemoryConfig } from './types.js'
 import { DEFAULT_TOP_K } from './types.js'
@@ -210,7 +214,29 @@ export const TOOL_NAMES = [
   'memory_digest',
 ] as const
 
+/**
+ * 启动归因：宿主崩在插件加载期时，光看崩溃日志分不清是谁拖慢/拖垮的。
+ * 这里在 apply 头和尾各落一行到 <tmp>/dsh-memory-agent-apply.log，
+ * 而且带上「距宿主进程启动多少毫秒」——那才是它在启动关键路径上的真实成本。
+ * 写文件失败就算了，绝不能因为打日志把宿主拖崩。
+ */
+const APPLY_LOG = join(tmpdir(), 'dsh-memory-agent-apply.log')
+function markApply(phase: string, startedAt: number): void {
+  const line = `[${new Date().toISOString()}] ${phase}`
+    + ` 距进程启动 ${Math.round(performance.now())}ms`
+    + (startedAt === 0 ? '' : ` 本插件 apply 耗时 ${Date.now() - startedAt}ms`)
+    + ` pid=${process.pid}\n`
+  console.warn(`[dsh-memory-agent] ${line.trimEnd()}`)
+  try {
+    appendFileSync(APPLY_LOG, line)
+  } catch {
+    // 打不了日志也别影响加载
+  }
+}
+
 export function apply(ctx: PluginContext, config?: MemoryConfig): void {
+  const applyStartedAt = Date.now()
+  markApply('apply 开始', 0)
   const backend = createFileBackend(resolveMemoryRoot(config, process.cwd()))
   // 运行期配置：cordis 配置打底 + <root>/config.json 覆盖（UI 面板改的就是后者）
   const runtime = createRuntimeConfig(backend.root, config)
@@ -813,6 +839,7 @@ export function apply(ctx: PluginContext, config?: MemoryConfig): void {
     }
     disposeHook()
   }, 'dsh-memory-agent:teardown')
+  markApply('apply 完成', applyStartedAt)
 }
 
 /* ------------------------------ 渲染（只影响观感） ------------------------------ */
