@@ -1,0 +1,40 @@
+# dsh-memory-agent bundle patch
+#
+# 顶层必须是数组；新增插件行用 insert，name 写 npm 包名（不写源码路径）。
+# 本插件零硬依赖：不捆绑、不依赖任何其他记忆插件，也不关闭别人的行。
+- insert:
+    - id: memory-agent
+      name: dsh-memory-agent
+      # sessions = 自动沉淀的数据源（ctx.sessions.list + deriveMessages）；
+      # 不进 inject 会在 apply 阶段拿不到服务，沉淀静默失效。
+      inject: [tools, systemPrompt, webServer, sessions]
+      config:
+        # 存储根目录。null = <cwd>/.agent/memory/
+        root: null
+        # true 时所有写入先落 suggested，必须 memory_confirm 才进入检索
+        requireConfirmation: false
+        # memory_assemble 的默认预算（token，口径 Math.ceil(字符数 / 1.6)）
+        defaultBudget: 1200
+        # memory_search_hybrid 的硬上限
+        maxTopK: 200
+        # 写入前把密钥/私钥/连接串密码/身份证号打码（面板里也能改）
+        redactSecrets: true
+        # 常驻注入：把记忆摘要自动带进每轮上下文（面板可关；空库时自然不注入）
+        injectEnabled: true
+        # 注入文本的字符预算硬顶（含标题行；超预算按「命中优先 + 最近更新」贪心保留并给省略提示）
+        injectBudgetChars: 1500
+        # 会话钩子：只注入/审计，默认关闭，绝不删除任何记忆
+        lifecycle:
+          enabled: false
+          audit: true
+          # 自动沉淀：把会话里用户明确表达的事实/偏好提炼成 suggested 记忆。
+          # 默认关闭——先观察几天准确率（面板「建议」列表里看），再决定是否打开。
+          # 打开后也只写 suggested，必须 memory_confirm 才进入检索。
+          autoSettle:
+            enabled: false
+            # 两次尝试的最小间隔（毫秒）：tick 每轮都会跑，太快会白扫
+            minIntervalMs: 90000
+            # 会话里至少这么多条用户消息才提炼（太少没有信息量）
+            minMessages: 4
+            # 单次最多沉淀几条（宁缺毋滥）
+            maxCandidates: 3

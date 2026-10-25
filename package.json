@@ -1,0 +1,74 @@
+{
+  "name": "dsh-memory-agent",
+  "version": "0.1.0",
+  "description": "File-based long-context memory for DeepSeek Harness: fixed read budget, BM25 hybrid search, confirmation gate, index rebuild, atomic writes and explicit session forget. Zero hard dependencies.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "long-context",
+    "bm25",
+    "agent"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.19"
+  },
+  "dshTarget": "0.2.1-rc.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build && node test/run-fixtures.mjs && node test/run-client-check.mjs && node test/run-api-check.mjs && node test/run-settle-check.mjs",
+    "test": "node test/run-fixtures.mjs",
+    "verify": "bash verify.sh",
+    "publish:all": "bash publish.sh",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0"
+  }
+}

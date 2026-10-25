@@ -1,0 +1,9 @@
+# 统一换行：脚本必须 LF，否则在 Linux/macOS 上 clone 后直接报
+# `$'\r': command not found`。
+* text=auto
+*.sh text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf

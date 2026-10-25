@@ -1,0 +1,15 @@
+node_modules/
+lib/
+*.tgz
+.agent/
+*.log
+.npmrc.publish
+.DS_Store
+Thumbs.db
+
+# 内部过程文档：只在本地，不进公开仓库
+# HANDOFF 含开发过程、本机环境事故与内部决策记录，不对外。
+ASSESSMENT.md
+EVALUATION-GUIDE.md
+NEXT-INSTRUCTIONS.md
+HANDOFF.md

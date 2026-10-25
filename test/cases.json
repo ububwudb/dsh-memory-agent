@@ -1,0 +1,2543 @@
+[
+  {
+    "name": "01-write-and-search-bm25",
+    "description": "写入两条记忆：BM25 命中第一条；tags 过滤生效",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "PostgreSQL 的 B-tree 索引适合等值与范围查询",
+          "tags": [
+            "database",
+            "postgresql"
+          ],
+          "entities": [
+            "PostgreSQL",
+            "B-tree"
+          ],
+          "session_id": "sess-x",
+          "confidence": 0.9
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "Python 的 asyncio 事件循环负责调度协程",
+          "tags": [
+            "python"
+          ],
+          "entities": [
+            "asyncio"
+          ],
+          "session_id": "sess-x"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "PostgreSQL 索引",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "asyncio",
+          "tags": [
+            "python"
+          ]
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 0,
+        "path": "path",
+        "includes": "topics/"
+      },
+      {
+        "step": 1,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 2,
+        "path": "0.score",
+        "gte": 0.5
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "id"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "02-bm25-tokenizer-not-substring",
+    "description": "CJK 单字+2gram 切分：只共享词面的条目才命中，零分条目被丢掉",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "深度学习模型训练需要大量算力",
+          "tags": [
+            "dl"
+          ],
+          "session_id": "sess-x"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "深度学习框架部署强调推理延迟",
+          "tags": [
+            "dl"
+          ],
+          "session_id": "sess-x"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "训练",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "深度学习",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "量子计算",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "训练",
+          "tags": [
+            "python"
+          ],
+          "top_k": 10
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "03-assemble-budget-hard-cap",
+    "description": "大量 hits + 小预算：used_tokens 绝不超过 budget",
+    "steps": [
+      {
+        "op": "writeMany",
+        "count": 40,
+        "input": {
+          "summary": "记忆条目 训练 数据 索引 第 {{i}} 条",
+          "tags": [
+            "load"
+          ],
+          "session_id": "sess-load"
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "训练 数据 索引",
+          "budget": 120
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "训练",
+          "budget": 1
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "budget": 100,
+          "hits": [
+            {
+              "id": "ghost-1",
+              "path": "topics/ghost-1.md",
+              "type": "topic",
+              "title": "Ghost 1",
+              "summary": {
+                "$repeat": {
+                  "text": "很长很长很长的摘要内容。",
+                  "count": 30
+                }
+              },
+              "score": 0.9
+            },
+            {
+              "id": "ghost-2",
+              "path": "topics/ghost-2.md",
+              "type": "topic",
+              "title": "Ghost 2",
+              "summary": {
+                "$repeat": {
+                  "text": "很长很长很长的摘要内容。",
+                  "count": 30
+                }
+              },
+              "score": 0.8
+            },
+            {
+              "id": "ghost-3",
+              "path": "topics/ghost-3.md",
+              "type": "topic",
+              "title": "Ghost 3",
+              "summary": {
+                "$repeat": {
+                  "text": "很长很长很长的摘要内容。",
+                  "count": 30
+                }
+              },
+              "score": 0.7
+            }
+          ]
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "length",
+        "value": 40
+      },
+      {
+        "step": 1,
+        "path": "used_tokens",
+        "lte": 120
+      },
+      {
+        "step": 1,
+        "path": "used_tokens",
+        "gte": 60
+      },
+      {
+        "step": 1,
+        "path": "context.length",
+        "lte": 360
+      },
+      {
+        "step": 1,
+        "path": "sources.length",
+        "gte": 2
+      },
+      {
+        "step": 2,
+        "path": "used_tokens",
+        "lte": 1
+      },
+      {
+        "step": 2,
+        "path": "context",
+        "value": ""
+      },
+      {
+        "step": 3,
+        "path": "used_tokens",
+        "lte": 100
+      },
+      {
+        "step": 3,
+        "path": "used_tokens",
+        "gte": 90
+      },
+      {
+        "step": 3,
+        "path": "sources.length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "context",
+        "includes": "topics/ghost-1.md"
+      }
+    ]
+  },
+  {
+    "name": "04-confirmation-gate",
+    "description": "requireConfirmation=true → suggested 不进检索；confirm 后才可见",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "用户偏好用 uv 管理 Python 依赖",
+          "tags": [
+            "pref"
+          ],
+          "session_id": "sess-y",
+          "requireConfirmation": true
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "uv 依赖",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "uv 依赖",
+          "budget": 300
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": "topics/"
+        }
+      },
+      {
+        "op": "confirm",
+        "input": {
+          "id": {
+            "$ref": {
+              "step": 0,
+              "path": "id"
+            }
+          }
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "uv 依赖",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "用户偏好 pnpm 作为默认包管理器",
+          "tags": [
+            "pref"
+          ],
+          "session_id": "sess-y"
+        }
+      },
+      {
+        "op": "confirm",
+        "input": {
+          "id": {
+            "$ref": {
+              "step": 6,
+              "path": "id"
+            }
+          }
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "suggested"
+      },
+      {
+        "step": 1,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 2,
+        "path": "used_tokens",
+        "value": 0
+      },
+      {
+        "step": 2,
+        "path": "context",
+        "value": ""
+      },
+      {
+        "step": 3,
+        "path": "entries.length",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 5,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 6,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 7,
+        "path": "status",
+        "value": "active"
+      }
+    ]
+  },
+  {
+    "name": "05-dedupe-and-conflict",
+    "description": "完全重复不产生第二条；同槽位不同内容 = 版本演进（旧版本转 superseded 且退出检索，文件仍可下钻）",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "Redis 缓存击穿的兜底方案是互斥重建",
+          "title": "Redis 缓存击穿",
+          "tags": [
+            "cache"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "Redis 缓存击穿的兜底方案是互斥重建",
+          "title": "Redis 缓存击穿",
+          "tags": [
+            "cache"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "Redis 缓存击穿更推荐逻辑过期加异步重建",
+          "title": "Redis 缓存击穿",
+          "tags": [
+            "cache"
+          ],
+          "session_id": "s2"
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "Redis 缓存击穿",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 2,
+              "path": "path"
+            }
+          }
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "id",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 1,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 2,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 2,
+        "path": "supersedes.0",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 3,
+        "path": "total",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "byStatus.active",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "byStatus.superseded",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 2,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 5,
+        "path": "readme",
+        "includes": "互斥重建"
+      },
+      {
+        "step": 6,
+        "path": "readme",
+        "includes": "逻辑过期"
+      }
+    ]
+  },
+  {
+    "name": "06-forget-session-soft-then-hard",
+    "description": "session_only 软删：标记 deleted_pending 且文件保留；hard 才物理删除",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "会话 A 的结论：锁竞争来自长事务",
+          "raw": "长事务持锁 3 秒导致行锁等待。",
+          "session_id": "sess-a"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "会话 B 的结论：与锁无关",
+          "session_id": "sess-b"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "会话 A 的另一条结论：需要索引",
+          "session_id": "sess-a"
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "forget",
+        "input": {
+          "session_id": "sess-a",
+          "scope": "session_only"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "锁竞争 长事务",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "exists",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "forget",
+        "input": {
+          "session_id": "sess-a",
+          "scope": "session_only",
+          "mode": "hard"
+        }
+      },
+      {
+        "op": "exists",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "indexStats"
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 3,
+        "path": "total",
+        "value": 4
+      },
+      {
+        "step": 4,
+        "path": "deleted_episode_count",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "deleted_raw_count",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "unlinked_topic_count",
+        "value": 0
+      },
+      {
+        "step": 4,
+        "path": "orphaned_topic_count",
+        "value": 0
+      },
+      {
+        "step": 4,
+        "path": "affected_paths.length",
+        "value": 2
+      },
+      {
+        "step": 4,
+        "path": "status_changes.length",
+        "value": 2
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 6,
+        "value": true
+      },
+      {
+        "step": 7,
+        "path": "byStatus.deleted_pending",
+        "value": 2
+      },
+      {
+        "step": 7,
+        "path": "total",
+        "value": 4
+      },
+      {
+        "step": 8,
+        "path": "deleted_episode_count",
+        "value": 0
+      },
+      {
+        "step": 9,
+        "value": false
+      },
+      {
+        "step": 10,
+        "path": "total",
+        "value": 2
+      },
+      {
+        "step": 10,
+        "path": "byStatus.deleted_pending",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "07-forget-shared-unlink",
+    "description": "include_shared_unlink：只解绑来源，sources 空则 orphaned，文件永不删除",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "团队约定：提交前跑 pnpm verify",
+          "title": "团队约定",
+          "session_id": "sess-a",
+          "sources": [
+            {
+              "session_id": "sess-b",
+              "kind": "session"
+            }
+          ]
+        }
+      },
+      {
+        "op": "forget",
+        "input": {
+          "session_id": "sess-a",
+          "scope": "include_shared_unlink"
+        }
+      },
+      {
+        "op": "forget",
+        "input": {
+          "session_id": "sess-b",
+          "scope": "include_shared_unlink"
+        }
+      },
+      {
+        "op": "exists",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "pnpm verify",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "ledger"
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "unlinked_topic_count",
+        "value": 1
+      },
+      {
+        "step": 1,
+        "path": "orphaned_topic_count",
+        "value": 0
+      },
+      {
+        "step": 1,
+        "path": "affected_paths.length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "unlinked_topic_count",
+        "value": 0
+      },
+      {
+        "step": 2,
+        "path": "orphaned_topic_count",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "value": true
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 5,
+        "path": "byStatus.orphaned",
+        "value": 1
+      },
+      {
+        "step": 6,
+        "path": "length",
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "08-rebuild-index-from-files",
+    "description": "坏索引行不崩溃；index.jsonl 删掉后能只靠文件重建，且状态保留",
+    "fixture": "seed-minimal",
+    "steps": [
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "nav"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "索引",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "removeFile",
+        "input": {
+          "path": "index.jsonl"
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "rebuild"
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "参数",
+          "top_k": 10
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "total",
+        "value": 4
+      },
+      {
+        "step": 0,
+        "path": "byStatus.active",
+        "value": 3
+      },
+      {
+        "step": 0,
+        "path": "byStatus.suggested",
+        "value": 1
+      },
+      {
+        "step": 1,
+        "path": "entries.length",
+        "value": 4
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "value": true
+      },
+      {
+        "step": 4,
+        "path": "total",
+        "value": 0
+      },
+      {
+        "step": 5,
+        "path": "entry_count",
+        "value": 4
+      },
+      {
+        "step": 5,
+        "path": "scanned",
+        "value": 4
+      },
+      {
+        "step": 5,
+        "path": "skipped",
+        "value": 0
+      },
+      {
+        "step": 6,
+        "path": "total",
+        "value": 4
+      },
+      {
+        "step": 6,
+        "path": "byStatus.suggested",
+        "value": 1
+      },
+      {
+        "step": 7,
+        "path": "length",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "09-nav-drilldown-never-leaks-raw",
+    "description": "nav 默认绝不展开 raw 全文；只有 path 显式指到文件才返回正文",
+    "fixture": "seed-minimal",
+    "steps": [
+      {
+        "op": "nav"
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": "raw/mem_s2.md"
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": "episodes/"
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": "topics"
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": "mem_s1"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "jsonNotIncludes": "EXPLAIN ANALYZE"
+      },
+      {
+        "step": 0,
+        "path": "entries.length",
+        "value": 4
+      },
+      {
+        "step": 1,
+        "path": "readme",
+        "includes": "EXPLAIN ANALYZE"
+      },
+      {
+        "step": 1,
+        "path": "entries.length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "entries.length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "entries.length",
+        "value": 2
+      },
+      {
+        "step": 4,
+        "path": "readme",
+        "includes": "PostgreSQL 索引选择"
+      }
+    ]
+  },
+  {
+    "name": "10-assemble-dedupes-raw-sibling",
+    "description": "父条目用 raw_ref 带出原文后，同一次 assemble 不再重复塞一条 raw 命中",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "SQLite WAL 模式允许读写并行",
+          "raw": "WAL 模式允许读写并行，checkpoint 负责把日志刷回主库。",
+          "tags": [
+            "sqlite"
+          ],
+          "session_id": "sess-wal"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "WAL",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "WAL",
+          "hits": {
+            "$ref": {
+              "step": 1,
+              "path": ""
+            }
+          },
+          "budget": 300
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 1,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "sources.length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "context",
+        "count": "checkpoint 负责把日志刷回主库",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "used_tokens",
+        "lte": 300
+      }
+    ]
+  },
+  {
+    "name": "11-nav-pagination",
+    "description": "nav 默认分页（50），能用 offset 翻页，has_more 如实反映还有没有",
+    "steps": [
+      {
+        "op": "writeMany",
+        "count": 60,
+        "input": {
+          "summary": "分页测试记忆 第 {{i}} 条",
+          "tags": [
+            "paging"
+          ],
+          "session_id": "sess-page"
+        }
+      },
+      {
+        "op": "nav",
+        "input": {}
+      },
+      {
+        "op": "nav",
+        "input": {
+          "offset": 50
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "limit": 5,
+          "offset": 0
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "length",
+        "value": 60
+      },
+      {
+        "step": 1,
+        "path": "entries.length",
+        "value": 50
+      },
+      {
+        "step": 1,
+        "path": "total",
+        "value": 60
+      },
+      {
+        "step": 1,
+        "path": "has_more",
+        "value": true
+      },
+      {
+        "step": 2,
+        "path": "entries.length",
+        "value": 10
+      },
+      {
+        "step": 2,
+        "path": "has_more",
+        "value": false
+      },
+      {
+        "step": 3,
+        "path": "entries.length",
+        "value": 5
+      },
+      {
+        "step": 3,
+        "path": "limit",
+        "value": 5
+      }
+    ]
+  },
+  {
+    "name": "12-resolve-conflict",
+    "description": "冲突需显式声明（expectConflict）：keep 后本条 active、同槽位其它冲突转 superseded 且退出检索",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "订单服务缓存用互斥重建兜底",
+          "title": "订单缓存策略",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "订单服务缓存改用逻辑过期加异步刷新",
+          "title": "订单缓存策略",
+          "session_id": "s2",
+          "expectConflict": true
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "订单缓存",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "resolve",
+        "input": {
+          "id": {
+            "$ref": {
+              "step": 1,
+              "path": "id"
+            }
+          },
+          "action": "keep"
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "订单缓存",
+          "top_k": 10
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 1,
+        "path": "status",
+        "value": "conflict"
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 3,
+        "path": "superseded.length",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "byStatus.active",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "byStatus.superseded",
+        "value": 1
+      },
+      {
+        "step": 4,
+        "path": "byStatus.conflict",
+        "value": 0
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 5,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "id"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "13-assemble-reports-omitted",
+    "description": "预算装不下的命中不会无声消失：omitted 如实计数",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "省略测试 A：记忆预算要把装不下的条目报出来",
+          "tags": [
+            "omit"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "省略测试 B：记忆预算要把装不下的条目报出来",
+          "tags": [
+            "omit"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "省略测试 C：记忆预算要把装不下的条目报出来",
+          "tags": [
+            "omit"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "省略测试",
+          "budget": 40
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 3,
+        "path": "used_tokens",
+        "lte": 40
+      },
+      {
+        "step": 3,
+        "path": "omitted",
+        "gte": 1
+      },
+      {
+        "step": 3,
+        "path": "sources.length",
+        "lte": 1
+      }
+    ]
+  },
+  {
+    "name": "14-write-redaction",
+    "description": "落盘前把密钥打码：输出报 redactions，文件里查不到原文",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "部署脚本里的 key 是 sk-abcdefghijklmnopqrstuvwx，GitHub 用 ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa，都别外传",
+          "tags": [
+            "ops"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "readFile",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "部署脚本",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "ledger"
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 0,
+        "path": "redactions.0",
+        "value": "openai-key"
+      },
+      {
+        "step": 0,
+        "path": "redactions.1",
+        "value": "github-token"
+      },
+      {
+        "step": 1,
+        "jsonNotIncludes": "sk-abcdefghijklmnopqrstuvwx"
+      },
+      {
+        "step": 1,
+        "jsonNotIncludes": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "step": 1,
+        "jsonIncludes": "[已脱敏:openai-key]"
+      },
+      {
+        "step": 1,
+        "jsonIncludes": "[已脱敏:github-token]"
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "15-exact-tag-boost",
+    "description": "查询词正好等于某个 tag 时加成，排序压过只在正文里提一句的条目",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "postgresql 连接池大小按 CPU 核数配",
+          "tags": [
+            "infra"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "数据库连接池经验总结，顺手提到了 postgresql",
+          "tags": [
+            "postgresql"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "postgresql",
+          "top_k": 5
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "id"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "16-index-cache-and-invalidation",
+    "description": "连续检索命中缓存；写入后缓存自动失效，新条目立刻可见",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "缓存测试：第一条 alpha 关键词",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "alpha",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "alpha",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "缓存测试：第二条 alpha 也带关键词",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "alpha",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "limit": 10
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "0.id"
+          }
+        }
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 5,
+        "path": "total",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "17-alias-recall",
+    "description": "库里没有「数据库」「检查」这些字，靠别名词表兜住，并标 reason=alias",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "本地开发连的是 sqlite，生产是 postgres",
+          "tags": [
+            "db"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "提交前跑 bash verify.sh，别跳过失败",
+          "tags": [
+            "workflow"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "数据库连的哪个",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "上线前要做什么检查",
+          "top_k": 5
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 2,
+        "path": "0.reason",
+        "value": "alias"
+      },
+      {
+        "step": 3,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 3,
+        "path": "0.reason",
+        "value": "alias"
+      }
+    ]
+  },
+  {
+    "name": "18-nav-facets",
+    "description": "nav 带库画像：标签分布、类型分布、总条数，让模型知道自己有什么",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "第一条：alpha 记录",
+          "tags": [
+            "t1"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "第二条：beta 记录",
+          "tags": [
+            "t2"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "sort": "recent",
+          "limit": 5
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "limit": 5
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "entries.length",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "facets.total",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "facets.retrievable",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "facets.tags.length",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "facets.types.topic",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "entries.length",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "has_more",
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "19-key-supersede",
+    "description": "显式 key 的版本演进：旧版转 superseded、原文兄弟一起退场、检索只剩新版、旧文件留档可下钻",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "项目默认包管理器是 npm",
+          "key": "project.pkg-manager",
+          "raw": "最初用 npm。",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "项目默认包管理器改成 pnpm，因为 workspace 依赖",
+          "key": "project.pkg-manager",
+          "raw": "迁移原因：npm 的 workspace 安装慢且重复。",
+          "session_id": "s2"
+        }
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "包管理器",
+          "top_k": 10
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      },
+      {
+        "op": "nav",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 1,
+              "path": "path"
+            }
+          }
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "supersedes.0",
+        "value": {
+          "$ref": {
+            "step": 0,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 2,
+        "path": "byStatus.superseded",
+        "value": 2
+      },
+      {
+        "step": 2,
+        "path": "byStatus.active",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 2
+      },
+      {
+        "step": 3,
+        "path": "0.id",
+        "value": {
+          "$ref": {
+            "step": 1,
+            "path": "id"
+          }
+        }
+      },
+      {
+        "step": 4,
+        "path": "readme",
+        "includes": "npm"
+      },
+      {
+        "step": 5,
+        "path": "readme",
+        "includes": "pnpm"
+      }
+    ]
+  },
+  {
+    "name": "20-sweep-readonly",
+    "description": "体检只列清单不删；刚写的不算久未命中；被取代的进 backlog；检索命中会落 usage 信号",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "体检样例：这条会被取代 v1",
+          "key": "sweep.demo",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "体检样例：这条取代了 v1",
+          "key": "sweep.demo",
+          "session_id": "s2"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "体检样例",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "sweep",
+        "input": {}
+      },
+      {
+        "op": "indexStats"
+      },
+      {
+        "op": "readFile",
+        "input": {
+          "path": "usage.jsonl"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "scanned",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "longUnused.length",
+        "value": 0
+      },
+      {
+        "step": 3,
+        "path": "supersededBacklog.length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "thresholds.longUnusedDays",
+        "value": 90
+      },
+      {
+        "step": 4,
+        "path": "total",
+        "value": 2
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "gte": 40
+      }
+    ]
+  },
+  {
+    "name": "21-inject-empty-library",
+    "description": "常驻注入：空库时不注入（文本为空、不占字符）",
+    "steps": [
+      {
+        "op": "inject",
+        "input": {
+          "budgetChars": 1500
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "text",
+        "value": ""
+      },
+      {
+        "step": 0,
+        "path": "chars",
+        "value": 0
+      },
+      {
+        "step": 0,
+        "path": "included",
+        "value": 0
+      },
+      {
+        "step": 0,
+        "path": "omitted",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "22-inject-budget-hard-cap",
+    "description": "常驻注入：字符预算硬顶——文本长度恒 ≤ 预算，放不下的给省略提示",
+    "steps": [
+      {
+        "op": "writeMany",
+        "count": 30,
+        "input": {
+          "summary": "注入预算样例 {{i}}：这条记忆描述了项目的第 {{i}} 条约定",
+          "session_id": "s-inject"
+        }
+      },
+      {
+        "op": "inject",
+        "input": {
+          "budgetChars": 600
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 1,
+        "path": "chars",
+        "lte": 600
+      },
+      {
+        "step": 1,
+        "path": "included",
+        "gte": 1
+      },
+      {
+        "step": 1,
+        "path": "omitted",
+        "gte": 1
+      },
+      {
+        "step": 1,
+        "path": "text",
+        "includes": "## 记忆（自动注入）"
+      },
+      {
+        "step": 1,
+        "path": "text",
+        "includes": "未注入"
+      }
+    ]
+  },
+  {
+    "name": "23-inject-prefers-hit-entries",
+    "description": "常驻注入优先级：命中过的条目排在没命中过的前面",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "注入优先级旧条目：数据库连接池默认十个",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "注入优先级新条目：向量检索暂缓上线",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "向量检索",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "inject",
+        "input": {
+          "budgetChars": 1500
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 3,
+        "path": "text",
+        "includes": "注入优先级旧条目"
+      },
+      {
+        "step": 3,
+        "path": "text",
+        "includes": "注入优先级新条目"
+      },
+      {
+        "step": 3,
+        "path": "text",
+        "before": "注入优先级新条目",
+        "after": "注入优先级旧条目"
+      }
+    ]
+  },
+  {
+    "name": "24-digest-build-refresh",
+    "description": "当前认知：缺失/过期自动重建（rebuilt=true），新鲜缓存直接复用（rebuilt=false），历史版本只报数量",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "连接池样例 v1：默认大小十个",
+          "key": "demo.pool",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "连接池样例 v2：默认大小二十",
+          "key": "demo.pool",
+          "session_id": "s2"
+        }
+      },
+      {
+        "op": "digest",
+        "input": {
+          "key": "demo.pool"
+        }
+      },
+      {
+        "op": "digest",
+        "input": {
+          "key": "demo.pool"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "连接池样例 v3：默认大小三十",
+          "key": "demo.pool",
+          "session_id": "s3"
+        }
+      },
+      {
+        "op": "digest",
+        "input": {
+          "key": "demo.pool"
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "slot",
+        "value": "demo.pool"
+      },
+      {
+        "step": 2,
+        "path": "rebuilt",
+        "value": true
+      },
+      {
+        "step": 2,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 2,
+        "path": "text",
+        "includes": "默认大小二十"
+      },
+      {
+        "step": 2,
+        "path": "text",
+        "includes": "历史版本"
+      },
+      {
+        "step": 3,
+        "path": "rebuilt",
+        "value": false
+      },
+      {
+        "step": 5,
+        "path": "rebuilt",
+        "value": true
+      },
+      {
+        "step": 5,
+        "path": "text",
+        "includes": "默认大小三十"
+      }
+    ]
+  },
+  {
+    "name": "25-digest-conflict-and-list",
+    "description": "当前认知：未裁决冲突标注在正文里（旧说法一并列出）；槽位清单标出 conflict 与新鲜度",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "主库用 PostgreSQL",
+          "key": "demo.db",
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "主库用 MySQL",
+          "key": "demo.db",
+          "session_id": "s2",
+          "expectConflict": true
+        }
+      },
+      {
+        "op": "digest",
+        "input": {
+          "key": "demo.db"
+        }
+      },
+      {
+        "op": "digest",
+        "input": {}
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "status",
+        "value": "conflict"
+      },
+      {
+        "step": 2,
+        "path": "text",
+        "includes": "未裁决冲突"
+      },
+      {
+        "step": 2,
+        "path": "text",
+        "includes": "主库用 PostgreSQL"
+      },
+      {
+        "step": 3,
+        "path": "slots.0.slot",
+        "value": "demo.db"
+      },
+      {
+        "step": 3,
+        "path": "slots.0.conflict",
+        "value": true
+      },
+      {
+        "step": 3,
+        "path": "slots.0.stale",
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "26-assemble-prefers-digest",
+    "description": "memory_assemble 命中槽位时优先用新鲜 digest：块头带 [digest] 与 digests/ 路径，预算与 omitted 口径不变",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "组装认知样例：检索走 BM25 加别名兜底",
+          "session_id": "s1",
+          "key": "demo.retrieve"
+        }
+      },
+      {
+        "op": "digest",
+        "input": {
+          "key": "demo.retrieve"
+        }
+      },
+      {
+        "op": "assemble",
+        "input": {
+          "task": "检索 BM25",
+          "budget": 400
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 2,
+        "path": "context",
+        "includes": "[digest]"
+      },
+      {
+        "step": 2,
+        "jsonIncludes": "digests/demo.retrieve.md"
+      },
+      {
+        "step": 2,
+        "path": "used_tokens",
+        "lte": 400
+      },
+      {
+        "step": 2,
+        "path": "omitted",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "27-query-log-bounded-and-zero-hit",
+    "description": "每次真实检索记一条 query-log：滞回裁剪稳态 ≤251 行保留最近 200，零命中查询留痕",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "查询日志样例：这条记录用来验证检索日志有界",
+          "tags": [
+            "qlog"
+          ],
+          "session_id": "s1"
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "查询日志样例",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "queryLog"
+      },
+      {
+        "op": "searchMany",
+        "input": {
+          "query": "查无此词 {{i}}",
+          "count": 300
+        }
+      },
+      {
+        "op": "queryLog"
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "查无此词 999",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "queryLog"
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.query",
+        "includes": "查询日志样例"
+      },
+      {
+        "step": 2,
+        "path": "0.hits",
+        "gte": 1
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "lte": 251
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "gte": 200
+      },
+      {
+        "step": 6,
+        "jsonIncludes": "查无此词 299"
+      }
+    ]
+  },
+  {
+    "name": "28-anchors-write-and-evaluate",
+    "description": "锚点随 write 落盘 front-matter：探测不到=未校验不判失效；路径失效/env 值变化判失效；路径恢复即复位；失效不撤检索",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "锚点样例：报告目录",
+          "key": "demo.anchor",
+          "session_id": "s1",
+          "anchors": [
+            {
+              "kind": "path-exists",
+              "value": "$MISSING_ANCHOR_PATH$"
+            },
+            {
+              "kind": "env",
+              "name": "DEMO_ANCHOR_VAR",
+              "value": "expected"
+            }
+          ]
+        }
+      },
+      {
+        "op": "anchorCheck",
+        "input": {}
+      },
+      {
+        "op": "anchorCheck",
+        "input": {
+          "paths": {
+            "$MISSING_ANCHOR_PATH$": false
+          },
+          "env": {
+            "DEMO_ANCHOR_VAR": "expected"
+          }
+        }
+      },
+      {
+        "op": "anchorCheck",
+        "input": {
+          "paths": {
+            "$MISSING_ANCHOR_PATH$": false
+          },
+          "env": {
+            "DEMO_ANCHOR_VAR": "different"
+          }
+        }
+      },
+      {
+        "op": "anchorCheck",
+        "input": {
+          "paths": {
+            "$MISSING_ANCHOR_PATH$": true
+          },
+          "env": {
+            "DEMO_ANCHOR_VAR": "expected"
+          }
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "锚点样例",
+          "top_k": 5
+        }
+      },
+      {
+        "op": "readFile",
+        "input": {
+          "path": {
+            "$ref": {
+              "step": 0,
+              "path": "path"
+            }
+          }
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 2,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 2,
+        "path": "0.failures.0.reason",
+        "includes": "路径已不存在"
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 3,
+        "path": "0.failures.0.reason",
+        "includes": "路径已不存在"
+      },
+      {
+        "step": 3,
+        "path": "0.failures.1.reason",
+        "includes": "环境变量"
+      },
+      {
+        "step": 3,
+        "path": "0.failures.1.reason",
+        "includes": "已变化"
+      },
+      {
+        "step": 4,
+        "path": "length",
+        "value": 0
+      },
+      {
+        "step": 5,
+        "path": "length",
+        "value": 1
+      },
+      {
+        "step": 6,
+        "jsonIncludes": "anchors:"
+      }
+    ]
+  },
+  {
+    "name": "29-anchor-stale-skips-injection",
+    "description": "锚点失效只撤常驻注入（staleSkipped 计数），保留检索：失效条目仍可被 search 命中",
+    "steps": [
+      {
+        "op": "write",
+        "input": {
+          "summary": "注入排除样例 A：带失效锚点",
+          "key": "demo.inj.a",
+          "session_id": "s1",
+          "anchors": [
+            {
+              "kind": "path-exists",
+              "value": "$MISSING_ANCHOR_PATH$"
+            }
+          ]
+        }
+      },
+      {
+        "op": "write",
+        "input": {
+          "summary": "注入排除样例 B：锚点健在",
+          "key": "demo.inj.b",
+          "session_id": "s1",
+          "anchors": [
+            {
+              "kind": "path-exists",
+              "value": "$EXISTING_ANCHOR_PATH$"
+            }
+          ]
+        }
+      },
+      {
+        "op": "inject",
+        "input": {
+          "budgetChars": 1500
+        }
+      },
+      {
+        "op": "search",
+        "input": {
+          "query": "注入排除样例",
+          "top_k": 5
+        }
+      }
+    ],
+    "expect": [
+      {
+        "step": 0,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 1,
+        "path": "status",
+        "value": "active"
+      },
+      {
+        "step": 2,
+        "path": "text",
+        "includes": "注入排除样例 B"
+      },
+      {
+        "step": 2,
+        "jsonNotIncludes": "注入排除样例 A"
+      },
+      {
+        "step": 2,
+        "path": "staleSkipped",
+        "gte": 1
+      },
+      {
+        "step": 3,
+        "path": "length",
+        "value": 2
+      }
+    ]
+  }
+]
